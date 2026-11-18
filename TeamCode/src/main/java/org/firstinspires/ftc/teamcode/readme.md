@@ -1,131 +1,98 @@
-## TeamCode Module
+# DECODE robot code
 
-Welcome!
+NextFTC 1.1 + FTC SDK 11.0. Hardware names are unchanged from the first-competition code, so the
+existing Driver Station configuration works as is.
 
-This module, TeamCode, is the place where you will write/paste the code for your team's
-robot controller App. This module is currently empty (a clean slate) but the
-process for adding OpModes is straightforward.
+## Layout
 
-## Creating your own OpModes
+| Package | What | Runs on |
+|---|---|---|
+| `logic/` | All decisions: mecanum maths, odometry, flywheel control, shot table, motif planner, shot sequencer, field rules, autonomous state machine | robot **and** PC (pure Java, unit tested + simulated) |
+| `config/RobotConfig` | Every hardware name and tunable number | both |
+| `subsystems/` | Thin hardware wrappers (NextFTC `Subsystem`s): Drive, Intake, Sorter, Kicker, Shooter, Vision | robot |
+| `opmodes/` | TeleOp (Main/Red/Blue), Auto (Red/Blue x Goal/Audience), `tuning/` OpModes | robot |
+| `src/test/` | 50 JUnit tests including a full 30 s autonomous physics simulation | PC |
 
-The easiest way to create your own OpMode is to copy a Sample OpMode and make it your own.
+## Driver controls (gamepad1; gamepad2 can also run every mechanism button)
 
-Sample opmodes exist in the FtcRobotController module.
-To locate these samples, find the FtcRobotController module in the "Project/Android" tab.
+| Input | Action |
+|---|---|
+| Left stick / right stick X | drive, strafe / turn (identical wheel output to the competition code — proven by `MecanumTest`) |
+| Left trigger | slow mode (40%) |
+| Right trigger | auto-aim at the goal with the Limelight (you keep translating) |
+| Triangle | intake on/off |
+| Cross (hold) | eject |
+| Square / Circle | sorter previous / next slot |
+| Right bumper (hold) | flywheel on (speed from the shot table when the goal tag is visible) |
+| Left bumper (hold) | kicker fire (manual single shot) |
+| D-pad up / down | hood trim |
+| D-pad left | **fire all 3 slots automatically** (waits for flywheel speed between shots) |
+| D-pad right | cancel the volley |
+| Share | toggle field-centric (starts robot-centric) |
+| Options | reset field-centric "forward" to where the robot faces now |
 
-Expand the following tree elements:
- FtcRobotController/java/org.firstinspires.ftc.robotcontroller/external/samples
+Use **TeleOp Red / TeleOp Blue** so auto-aim ignores the other alliance's goal. The autos preselect them.
 
-### Naming of Samples
+## Autonomous
 
-To gain a better understanding of how the samples are organized, and how to interpret the
-naming system, it will help to understand the conventions that were used during their creation.
+Each auto: drive to the shot spot while the flywheel spins up, aim (Limelight tx, odometry fallback),
+fire the 3 preloads in the obelisk MOTIF order, then LEAVE. Simulated: done in about 5-6 s.
+It gives up shooting at 24 s, whatever happens, so it still scores LEAVE.
 
-These conventions are described (in detail) in the sample_conventions.md file in this folder.
+Load the sorter **slot 0 = GREEN, slot 1 = PURPLE, slot 2 = PURPLE** (`RobotConfig.PRELOAD`).
+The motif is read from the obelisk tags (21 GPP, 22 PGP, 23 PPG). If the motif is never seen, the auto
+fires slots in order.
 
-To summarize: A range of different samples classes will reside in the java/external/samples.
-The class names will follow a naming convention which indicates the purpose of each class.
-The prefix of the name will be one of the following:
+| Auto | Start placement (Red shown; Blue is the mirror image) |
+|---|---|
+| Goal | Front bumper flat against the front face of **our goal**, robot centred on the goal face, facing the goal, straddling the launch line. Backs up to about (-30, 24), shoots, leaves to about (-6, 40). |
+| Audience | Back bumper against the **audience wall**, 12 in from the centre line on our side, facing the goals, straddling the small launch zone line. Shoots from 5 in off the wall, leaves to about (34, 26). |
 
-Basic:  	This is a minimally functional OpMode used to illustrate the skeleton/structure
-            of a particular style of OpMode.  These are bare bones examples.
+Coordinates are FTC SDK field inches (origin field centre, goals at -X, Red +Y). Rule checks
+(start over a launch line touching our goal or the wall on our half, launch only from a zone, end
+outside both zones) are automated in `FieldRulesTest` and `AutoSimulationTest`.
 
-Sensor:    	This is a Sample OpMode that shows how to use a specific sensor.
-            It is not intended to drive a functioning robot, it is simply showing the minimal code
-            required to read and display the sensor values.
+## Tuning checklist: do these in order before the next event
 
-Robot:	    This is a Sample OpMode that assumes a simple two-motor (differential) drive base.
-            It may be used to provide a common baseline driving OpMode, or
-            to demonstrate how a particular sensor or concept can be used to navigate.
+Values marked `TUNE` in `RobotConfig` are defaults that have **not** been measured on this robot.
 
-Concept:	This is a sample OpMode that illustrates performing a specific function or concept.
-            These may be complex, but their operation should be explained clearly in the comments,
-            or the comments should reference an external doc, guide or tutorial.
-            Each OpMode should try to only demonstrate a single concept so they are easy to
-            locate based on their name.  These OpModes may not produce a drivable robot.
+1. **Tune: Drive Motors**: hold each face button. Every wheel must push forward and its count go up.
+   Then press Share, push the robot exactly 48 in, copy *inches per tick* into `DRIVE_INCHES_PER_TICK`.
+   Strafe 48 in by hand to set `LATERAL_MULTIPLIER`.
+2. **Tune: Servos**: confirm `SORTER_POSITIONS`, `KICKER_REST` / `KICKER_FIRE` and the hood range.
+3. **Tune: Shooter, step 1 (most important)**: hold Square (0.8 power, the competition shot) until the
+   speed settles and copy *kV estimate* into `flywheelGains().kV`. Until you do, closed-loop control
+   aims for 2240 ticks/s, which is only the competition shot if the wheel really reached 2240 at 0.8
+   power. If shots fly long or short before tuning, this is why.
+4. **Tune: Shooter, step 2**: at 4-6 distances across both launch zones, hold RB, adjust speed and hood
+   until LB shots score, and copy each `ROW` line into `shotTable()`. The Audience auto is a long shot
+   (about 125 in) and needs a real row out there.
+5. **Tune: Limelight**: confirm pipeline 8 sees tags 20/24 and 21-23, and set `LIMELIGHT_HEIGHT_IN`.
+6. Measure the bumper footprint into `ROBOT_LENGTH` / `ROBOT_WIDTH` and re-run the tests.
 
-After the prefix, other conventions will apply:
-
-* Sensor class names are constructed as:    Sensor - Company - Type
-* Robot class names are constructed as:     Robot - Mode - Action - OpModetype
-* Concept class names are constructed as:   Concept - Topic - OpModetype
-
-Once you are familiar with the range of samples available, you can choose one to be the
-basis for your own robot.  In all cases, the desired sample(s) needs to be copied into
-your TeamCode module to be used.
-
-This is done inside Android Studio directly, using the following steps:
-
- 1) Locate the desired sample class in the Project/Android tree.
-
- 2) Right click on the sample class and select "Copy"
-
- 3) Expand the  TeamCode/java folder
-
- 4) Right click on the org.firstinspires.ftc.teamcode folder and select "Paste"
-
- 5) You will be prompted for a class name for the copy.
-    Choose something meaningful based on the purpose of this class.
-    Start with a capital letter, and remember that there may be more similar classes later.
-
-Once your copy has been created, you should prepare it for use on your robot.
-This is done by adjusting the OpMode's name, and enabling it to be displayed on the
-Driver Station's OpMode list.
-
-Each OpMode sample class begins with several lines of code like the ones shown below:
+## Tests and simulation
 
 ```
- @TeleOp(name="Template: Linear OpMode", group="Linear Opmode")
- @Disabled
+./gradlew :TeamCode:testDebugUnitTest
 ```
 
-The name that will appear on the driver station's "opmode list" is defined by the code:
- ``name="Template: Linear OpMode"``
-You can change what appears between the quotes to better describe your opmode.
-The "group=" portion of the code can be used to help organize your list of OpModes.
+Runs on a laptop, no robot needed. `AutoSimulationTest` drives the real `AutoRoutine`, odometry and
+flywheel controller against a physics model (motor lag, strafe slip, encoder quantisation, IMU drift,
+battery sag, per-shot flywheel speed loss, servo travel, noisy delayed Limelight, 12-28 ms loop jitter).
+It covers every alliance x start x motif, 40 random seeds, no Limelight, an unplugged flywheel encoder,
+a heavy slow flywheel, a low battery with heavy strafe slip, and a pinned robot.
+Traces go to `TeamCode/build/sim/*.csv`; `python TeamCode/tools/plot_sim.py` draws them on the field
+(see `TeamCode/docs/auto-sim.svg`).
 
-As shown, the current OpMode will NOT appear on the driver station's OpMode list because of the
-  ``@Disabled`` annotation which has been included.
-This line can simply be deleted , or commented out, to make the OpMode visible.
+Each change to tunables should be followed by a test run: the rule checks catch illegal paths (they
+already caught one: the first audience shot spot let the corners swing into the wall).
 
+## Changes from the first-competition code
 
-
-## ADVANCED Multi-Team App management:  Cloning the TeamCode Module
-
-In some situations, you have multiple teams in your club and you want them to all share
-a common code organization, with each being able to *see* the others code but each having
-their own team module with their own code that they maintain themselves.
-
-In this situation, you might wish to clone the TeamCode module, once for each of these teams.
-Each of the clones would then appear along side each other in the Android Studio module list,
-together with the FtcRobotController module (and the original TeamCode module).
-
-Selective Team phones can then be programmed by selecting the desired Module from the pulldown list
-prior to clicking to the green Run arrow.
-
-Warning:  This is not for the inexperienced Software developer.
-You will need to be comfortable with File manipulations and managing Android Studio Modules.
-These changes are performed OUTSIDE of Android Studios, so close Android Studios before you do this.
- 
-Also.. Make a full project backup before you start this :)
-
-To clone TeamCode, do the following:
-
-Note: Some names start with "Team" and others start with "team".  This is intentional.
-
-1)  Using your operating system file management tools, copy the whole "TeamCode"
-    folder to a sibling folder with a corresponding new name, eg: "Team0417".
-
-2)  In the new Team0417 folder, delete the TeamCode.iml file.
-
-3)  the new Team0417 folder, rename the "src/main/java/org/firstinspires/ftc/teamcode" folder
-    to a matching name with a lowercase 'team' eg:  "team0417".
-
-4)  In the new Team0417/src/main folder, edit the "AndroidManifest.xml" file, change the line that contains
-         package="org.firstinspires.ftc.teamcode"
-    to be
-         package="org.firstinspires.ftc.team0417"
-
-5)  Add:    include ':Team0417' to the "/settings.gradle" file.
-    
-6)  Open up Android Studios and clean out any old files by using the menu to "Build/Clean Project""
+* It compiles again: NextFTC was not declared as a dependency, and `TeleOpMain` imported a class that
+  did not exist.
+* `Shooter` and `Picker` both drove `pickerServo`; now only `KickerSubsystem` does.
+* Drive motor directions are flipped with the opposite sign in the maths, so the wheels get exactly the same
+  output, and odometry now reads forward as positive.
+* Flywheel: fixed 0.8 power changed to battery-compensated closed-loop speed, with an automatic
+  open-loop fallback if its encoder is unplugged.

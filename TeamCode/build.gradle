@@ -9,8 +9,6 @@
 // before doing so.
 
 
-// Custom definitions may go here
-
 // Include common definitions from above.
 apply from: '../build.common.gradle'
 apply from: '../build.dependencies.gradle'
@@ -21,8 +19,29 @@ android {
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
+
+    testOptions {
+        unitTests {
+            // Pure-Java logic + simulation tests run on the desktop JVM (no robot needed):
+            //   ./gradlew :TeamCode:testDebugUnitTest
+            returnDefaultValues = true
+            all {
+                testLogging {
+                    events "failed"
+                    exceptionFormat "full"
+                }
+            }
+        }
+    }
 }
 
 dependencies {
     implementation project(':FtcRobotController')
+
+    // NextFTC command framework (https://nextftc.dev) — the team's existing framework.
+    implementation 'dev.nextftc:ftc:1.1.0'
+    implementation 'dev.nextftc:hardware:1.1.0'
+    implementation 'dev.nextftc:control:1.0.0'
+
+    testImplementation 'junit:junit:4.13.2'
 }
