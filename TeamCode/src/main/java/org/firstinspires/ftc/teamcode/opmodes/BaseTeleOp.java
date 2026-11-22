@@ -162,7 +162,13 @@ public abstract class BaseTeleOp extends NextFTCOpMode {
 
         boolean aiming = gp.right_trigger > 0.3;
         if (aiming && goal != null) {
-            turn = aim.calculate(AimController.errorFromVision(goal.txDegrees), dt);
+            // Correct the off-centre camera's tx with the camera range (odometry distance as fallback).
+            double camDist = FieldGeometry.floorDistanceFromRange(goal.rangeInches, RobotConfig.LIMELIGHT_HEIGHT_IN);
+            if (!MathUtil.isFinite(camDist)) {
+                camDist = FieldGeometry.distanceToGoal(drive.getPose(), goalAlliance(goal))
+                        - RobotConfig.LIMELIGHT_FORWARD_IN;
+            }
+            turn = aim.calculate(aim.errorFromVision(goal.txDegrees, camDist), dt);
         } else {
             aim.reset();
         }
@@ -193,7 +199,7 @@ public abstract class BaseTeleOp extends NextFTCOpMode {
 
         // ---- telemetry
         telemetry.addData("Drive", fieldCentric ? "FIELD-centric" : "robot-centric");
-        telemetry.addData("Pose", drive.getPose());
+        telemetry.addData("Pose", "%s  [%s]", drive.getPose(), drive.getPoseSource());
         telemetry.addData("Flywheel", "%s target %.0f  actual %.0f  pwr %.2f%s",
                 shooter.isReady() ? "READY" : "spinning", shooter.getTargetVelocity(), shooter.getVelocity(),
                 shooter.getPower(), shooter.isEncoderFault() ? "  ENCODER FAULT (open loop)" : "");
@@ -211,5 +217,9 @@ public abstract class BaseTeleOp extends NextFTCOpMode {
     @Override
     public void onStop() {
         VisionSubsystem.INSTANCE.stop();
+    }
+
+    private static Alliance goalAlliance(VisionSubsystem.GoalSighting g) {
+        return g.tagId == Alliance.RED.goalTagId ? Alliance.RED : Alliance.BLUE;
     }
 }

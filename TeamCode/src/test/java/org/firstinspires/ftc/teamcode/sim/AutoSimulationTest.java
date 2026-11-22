@@ -36,7 +36,12 @@ public class AutoSimulationTest {
     }
 
     static Result run(Alliance alliance, AutoPaths.Start start, Motif motif, SimRobot.Params params, String traceName) {
-        AutoRoutine routine = new AutoRoutine(RobotConfig.autoSettings(), alliance, start, RobotConfig.PRELOAD,
+        return run(RobotConfig.autoSettings(), alliance, start, motif, params, traceName);
+    }
+
+    static Result run(AutoRoutine.Settings settings, Alliance alliance, AutoPaths.Start start, Motif motif,
+            SimRobot.Params params, String traceName) {
+        AutoRoutine routine = new AutoRoutine(settings, alliance, start, RobotConfig.PRELOAD,
                 RobotConfig.SORTER_START_SLOT);
         Pose2d startPose = routine.getPlan().start;
         SimRobot sim = new SimRobot(params, startPose, RobotConfig.PRELOAD, alliance);
@@ -105,6 +110,30 @@ public class AutoSimulationTest {
                     assertScoringAuto(tag, r, m);
                 }
             }
+        }
+    }
+
+    private static double meanAbsAimError(Result r) {
+        double sum = 0;
+        for (SimRobot.Shot s : r.sim.shots) sum += Math.abs(s.aimErrorDeg);
+        return sum / r.sim.shots.size();
+    }
+
+    @Test
+    public void offCentreLimelightIsCorrectedForParallax() {
+        // CAD: the Limelight is 3.7in right of the shooter. Aiming the CAMERA at the tag would put every
+        // goal-start shot ~5 degrees off; the parallax correction must bring the SHOOTER onto the goal.
+        for (Alliance a : Alliance.values()) {
+            Result fixed = run(a, AutoPaths.Start.GOAL, Motif.GPP, new SimRobot.Params(), null);
+            assertEquals(3, fixed.sim.shots.size());
+            assertTrue(a + " corrected aim error " + meanAbsAimError(fixed), meanAbsAimError(fixed) < 2.0);
+
+            AutoRoutine.Settings naive = RobotConfig.autoSettings();
+            naive.aim.cameraForward = 0;
+            naive.aim.cameraLeft = 0;
+            Result uncorrected = run(naive, a, AutoPaths.Start.GOAL, Motif.GPP, new SimRobot.Params(), null);
+            assertTrue(a + " uncorrected aim error should be large, was " + meanAbsAimError(uncorrected),
+                    meanAbsAimError(uncorrected) > 3.0);
         }
     }
 

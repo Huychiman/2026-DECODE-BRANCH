@@ -24,10 +24,15 @@ import java.util.Random;
  */
 public final class SimRobot {
     public static final class Params {
-        public double maxWheelSpeed = 50; // in/s at full power
+        /** Loaded wheel speed at full power: 80% of the CAD drivetrain's free speed (~54 in/s). */
+        public double maxWheelSpeed = 0.8 * RobotConfig.DRIVE_FREE_SPEED_IN_PER_S;
         public double wheelTau = 0.12; // s
         public double strafeEfficiency = 0.88; // fraction of commanded strafe actually achieved
-        public double trackRadius = 13; // in: wheel speed / angular speed
+        /** Mecanum turning radius = half track width + half wheelbase (CAD: ~13.6in). */
+        public double trackRadius = (RobotConfig.TRACK_WIDTH_IN + RobotConfig.WHEELBASE_IN) / 2;
+        /** Limelight lens position relative to the robot centre (CAD), inches. */
+        public double cameraForward = RobotConfig.LIMELIGHT_FORWARD_IN;
+        public double cameraLeft = RobotConfig.LIMELIGHT_LEFT_IN;
         public double imuNoiseRad = Math.toRadians(0.15);
         public double imuDriftRadPerSec = Math.toRadians(0.05);
         public double flywheelFreeTps = 2800;
@@ -131,10 +136,15 @@ public final class SimRobot {
         return p.batteryVolts - p.batterySagPerAmpProxy * MathUtil.clamp(load, 0, 1);
     }
 
-    /** Delayed, noisy Limelight tx to our goal (degrees, + = goal to the right), or null. */
+    /**
+     * Delayed, noisy Limelight tx to our goal (degrees, + = goal to the right), or null. Measured from the
+     * camera's real (off-centre) position, so a controller that ignores the mount offset aims wrong.
+     */
     public Double visionTx() {
         if (!p.visionAvailable) return null;
-        double want = Math.atan2(alliance.goalY() - y, alliance.goalX() - x);
+        double cx = x + p.cameraForward * Math.cos(heading) - p.cameraLeft * Math.sin(heading);
+        double cy = y + p.cameraForward * Math.sin(heading) + p.cameraLeft * Math.cos(heading);
+        double want = Math.atan2(alliance.goalY() - cy, alliance.goalX() - cx);
         double err = Math.toDegrees(MathUtil.wrapAngle(want - heading));
         txHistory.add(new double[] {time, -err});
         while (txHistory.size() > 1 && txHistory.get(1)[0] <= time - p.visionLatency) txHistory.remove(0);

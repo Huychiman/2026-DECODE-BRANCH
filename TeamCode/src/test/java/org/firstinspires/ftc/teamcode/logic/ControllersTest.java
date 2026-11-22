@@ -72,6 +72,32 @@ public class ControllersTest {
         assertEquals(Math.PI / 2, aim.errorFromPose(new Pose2d(0, 0, 0), 0, 10), 1e-9);
     }
 
+    @Test
+    public void visionAimCorrectsOffCentreCamera() {
+        AimController.Gains g = new AimController.Gains();
+        g.cameraForward = 7.7;
+        g.cameraLeft = -3.66; // CAD: Limelight right of the shooter centre line
+        AimController aim = new AimController(g);
+        for (double bearingDeg : new double[] {0, 12, -20}) {
+            for (double dist : new double[] {30, 60, 125}) {
+                // Tag at robot-frame bearing/distance from the robot centre; what does the camera see?
+                double b = Math.toRadians(bearingDeg);
+                double tagX = dist * Math.cos(b), tagY = dist * Math.sin(b);
+                double dx = tagX - g.cameraForward, dy = tagY - g.cameraLeft;
+                double tx = -Math.toDegrees(Math.atan2(dy, dx));
+                assertEquals("bearing " + bearingDeg + " dist " + dist, b,
+                        aim.errorFromVision(tx, Math.hypot(dx, dy)), 1e-9);
+            }
+        }
+        // Tag dead ahead of the shooter at 40in: the camera sees it LEFT of its crosshair (tx < 0) but the
+        // shooter needs no turn.
+        double tx = -Math.toDegrees(Math.atan2(0 - g.cameraLeft, 40 - g.cameraForward));
+        assertTrue(tx < -5);
+        assertEquals(0, aim.errorFromVision(tx, Math.hypot(40 - g.cameraForward, g.cameraLeft)), 1e-9);
+        // Unknown distance: falls back to plain tx.
+        assertEquals(AimController.errorFromVision(4), aim.errorFromVision(4, Double.NaN), 0);
+    }
+
     private static double run(FlywheelController c, double voltage, double seconds, boolean encoderWorks) {
         double speed = 0, dt = 0.02, free = 2800, tau = 0.35;
         for (double t = 0; t < seconds; t += dt) {

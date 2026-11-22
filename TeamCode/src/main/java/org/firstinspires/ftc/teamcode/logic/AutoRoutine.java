@@ -156,7 +156,9 @@ public final class AutoRoutine {
     private double aimError(Pose2d pose, Double tx) {
         double odoErr = aim.errorFromPose(pose, alliance.goalX(), alliance.goalY());
         if (tx != null && MathUtil.isFinite(tx)) {
-            double visErr = AimController.errorFromVision(tx);
+            // Off-centre camera: correct tx for parallax using the odometry distance to the goal.
+            double camDist = FieldGeometry.distanceToGoal(pose, alliance) - s.aim.cameraForward;
+            double visErr = aim.errorFromVision(tx, camDist);
             // Reject a reading wildly different from odometry (wrong tag, reflection).
             if (Math.abs(MathUtil.wrapAngle(visErr - odoErr)) < Math.toRadians(25)) return visErr;
         }

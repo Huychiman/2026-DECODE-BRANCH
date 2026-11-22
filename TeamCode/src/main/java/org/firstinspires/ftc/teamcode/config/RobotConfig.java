@@ -33,6 +33,12 @@ public final class RobotConfig {
     public static final String HOOD_RIGHT = "shooterAngle1"; // gets 1 - hood position (mirrored)
     public static final String KICKER_SERVO = "pickerServo";
     public static final String LIMELIGHT = "limelight";
+    /**
+     * goBILDA Pinpoint odometry computer (I2C device type "goBILDA Pinpoint Odometry Computer"). The CAD
+     * has one with two 4-bar dead-wheel pods. Optional: if it is not in the Driver Station configuration
+     * the drive falls back to drive-motor encoders + the Control Hub IMU.
+     */
+    public static final String PINPOINT = "pinpoint";
 
     // ---------------------------------------------------------------- drive
     /*
@@ -51,20 +57,60 @@ public final class RobotConfig {
     public static final double SLOW_MODE_SCALE = 0.4;
     public static final double STICK_DEADBAND = 0.05;
 
-    /** TUNE: goBILDA 312rpm (537.7 ticks/rev) with 104mm wheels. Use "Tune: Drive Motors". */
-    public static final double DRIVE_INCHES_PER_TICK = (104.0 / 25.4 * Math.PI) / 537.7;
+    /*
+     * Drivetrain from the "Robot" CAD (Fusion project BFC 2025-2026, Chassis):
+     * REV HD Hex motor (28 counts/motor rev) + UltraPlanetary 4:1 cartridge (REV-41-1602, real 76:21)
+     * + 5:1 cartridge (REV-41-1603, real 68:13), then a 22T:22T HTD 5M belt (1:1) to a 104mm mecanum wheel.
+     */
+    public static final double DRIVE_WHEEL_DIAMETER_IN = 104.0 / 25.4;
+    public static final double DRIVE_GEAR_RATIO = (76.0 / 21.0) * (68.0 / 13.0); // 18.93:1 (nominal 20:1)
+    public static final double DRIVE_TICKS_PER_WHEEL_REV = 28.0 * DRIVE_GEAR_RATIO; // 530.05
+    /** Check with "Tune: Drive Motors" (push 48in) if wheels or gearboxes change. */
+    public static final double DRIVE_INCHES_PER_TICK = DRIVE_WHEEL_DIAMETER_IN * Math.PI / DRIVE_TICKS_PER_WHEEL_REV;
+    /** Free speed at the wheel, in/s (HD Hex 6000rpm). The simulation uses 80% of this as loaded speed. */
+    public static final double DRIVE_FREE_SPEED_IN_PER_S =
+            6000.0 / 60.0 / DRIVE_GEAR_RATIO * DRIVE_WHEEL_DIAMETER_IN * Math.PI;
+    /** CAD wheel centres: track width 39.2cm, wheelbase 29.7cm. */
+    public static final double TRACK_WIDTH_IN = 39.2 / 2.54;
+    public static final double WHEELBASE_IN = 29.7 / 2.54;
     /**
      * TUNE: actual strafe distance / odometry strafe distance (strafe 48in by hand). Mecanum rollers
      * slip sideways, so the real value is usually a bit below 1.0.
      */
     public static final double LATERAL_MULTIPLIER = 1.0;
 
-    /** Robot bumper footprint in inches (18in max sizing cube). TUNE to the real robot. */
-    public static final double ROBOT_LENGTH = 18.0;
-    public static final double ROBOT_WIDTH = 18.0;
+    /*
+     * Footprint from the CAD bounding box. Width (side plate to side plate) is 45.7cm = 18.0in. Length is
+     * 48.1cm = 18.9in: the rigid chassis is 43cm, the cable channel sticks out 1.8cm at the back and the
+     * intake roller 3.3cm at the front. NOTE: 18.9in is over the 18in starting size limit unless the
+     * intake roller compresses or the real robot differs from the CAD. Measure it before inspection.
+     * Rule checks and the simulation use the CAD value (conservative for walls and LEAVE).
+     */
+    public static final double ROBOT_LENGTH = 48.1 / 2.54;
+    public static final double ROBOT_WIDTH = 45.7 / 2.54;
+
+    // ---------------------------------------------------------------- Pinpoint odometry
+    /*
+     * Pod positions from the CAD, relative to the robot centre (middle of the four wheels). Pinpoint sign
+     * convention: X (forward-measuring) pod offset is + to the LEFT, Y (strafe) pod offset is + FORWARD.
+     * The forward pod is beside the right side plate, 19.45cm right of centre; the strafe pod is on the
+     * left side, 1.45cm behind centre.
+     * Verify with "Tune: Pinpoint": spin in place 10 turns, X and Y must stay within about 1in.
+     */
+    public static final double PINPOINT_X_POD_OFFSET_MM = -194.5;
+    public static final double PINPOINT_Y_POD_OFFSET_MM = -14.5;
+    /** TUNE with "Tune: Pinpoint": pushing forward must increase X, pushing left must increase Y. */
+    public static final boolean PINPOINT_X_REVERSED = false;
+    public static final boolean PINPOINT_Y_REVERSED = false;
 
     // ---------------------------------------------------------------- sorter (rearranger)
-    /** Servo positions for slots 0, 1, 2 (were "slot 1..3" in the competition code). */
+    /**
+     * Servo positions for slots 0, 1, 2 (were "slot 1..3" in the competition code, tuned on the robot).
+     * CAD check: the indexer is a 38T gear driving a 20T gear on the 3-cup carousel (120 degrees per
+     * slot). With a 270-degree REV Smart Servo on the 38T gear that would be 0.234 per slot, not 0.40.
+     * The competition values are kept because they were set on the real robot; if the cups do not line
+     * up with the pusher, re-measure them with "Tune: Servos".
+     */
     public static final double[] SORTER_POSITIONS = {0.10, 0.50, 0.90};
     public static final int SORTER_START_SLOT = 0;
 
@@ -86,7 +132,12 @@ public final class RobotConfig {
     public static final double HOOD_MAX = 0.90;
     public static final double HOOD_STEP = 0.05;
     public static final double FLYWHEEL_STEP_TPS = 50;
-    /** Flywheel motor encoder ticks per revolution (goBILDA 6000rpm bare motor = 28). TUNE. */
+    /*
+     * Shooter from the CAD: REV HD Hex motor -> 30T:30T GT2 belt -> four REV 90mm grip wheels. Hood: REV
+     * Smart Servo with a 24T gear on a 264T sector, so the full servo range moves the hood ~24.5 degrees.
+     * Speeds are MOTOR encoder ticks/s (28 per motor rev, 2800 ticks/s at the 6000rpm free speed).
+     */
+    /** REV HD Hex motor encoder counts per motor revolution. */
     public static final double FLYWHEEL_TICKS_PER_REV = 28;
     /** Old fixed power 0.8 x 2800 ticks/s free speed: the shot that worked at competition. */
     public static final double FLYWHEEL_DEFAULT_TPS = 2240;
@@ -114,8 +165,16 @@ public final class RobotConfig {
     // ---------------------------------------------------------------- vision
     /** Limelight pipeline used at competition for AprilTags. */
     public static final int LIMELIGHT_APRILTAG_PIPELINE = 8;
-    /** TUNE: Limelight lens height above the floor, inches. Converts tag range to floor distance. */
-    public static final double LIMELIGHT_HEIGHT_IN = 10.0;
+    /*
+     * Limelight 3A mount from the CAD (Shooter / camera holder). It sits 3.7in RIGHT of the shooter's
+     * centre line, so "tx = 0" alone would aim the shooter 3.7in right of the tag. AimController corrects
+     * this parallax using the distance to the goal.
+     */
+    /** Lens height above the floor, inches. Converts tag range to floor distance. */
+    public static final double LIMELIGHT_HEIGHT_IN = 22.2 / 2.54;
+    /** Lens position relative to the robot centre, inches (forward +, left +). */
+    public static final double LIMELIGHT_FORWARD_IN = 19.5 / 2.54;
+    public static final double LIMELIGHT_LEFT_IN = -9.3 / 2.54;
 
     // ---------------------------------------------------------------- autonomous
     /**
@@ -129,7 +188,10 @@ public final class RobotConfig {
     }
 
     public static AimController.Gains aimGains() {
-        return new AimController.Gains();
+        AimController.Gains g = new AimController.Gains();
+        g.cameraForward = LIMELIGHT_FORWARD_IN;
+        g.cameraLeft = LIMELIGHT_LEFT_IN;
+        return g;
     }
 
     public static AutoRoutine.Settings autoSettings() {

@@ -13,7 +13,8 @@ import sys
 
 S = 5.0  # px per inch
 PAD = 40
-ROBOT = 18.0
+ROBOT_L = 48.1 / 2.54  # CAD footprint (RobotConfig.ROBOT_LENGTH / ROBOT_WIDTH)
+ROBOT_W = 45.7 / 2.54
 TRACES = [
     ("red_goal_pgp", "#d93f3f", "Red Goal"),
     ("red_audience_pgp", "#f08a24", "Red Audience"),
@@ -35,7 +36,8 @@ def poly(points, **attrs):
 def footprint(x, y, h_deg):
     h = math.radians(h_deg)
     out = []
-    for lx, ly in ((9, 9), (9, -9), (-9, -9), (-9, 9)):
+    hl, hw = ROBOT_L / 2, ROBOT_W / 2
+    for lx, ly in ((hl, hw), (hl, -hw), (-hl, -hw), (-hl, hw)):
         out.append((x + lx * math.cos(h) - ly * math.sin(h), y + lx * math.sin(h) + ly * math.cos(h)))
     return out
 

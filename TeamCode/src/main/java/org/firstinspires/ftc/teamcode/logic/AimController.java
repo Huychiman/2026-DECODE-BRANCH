@@ -16,6 +16,9 @@ public final class AimController {
         public double tolerance = Math.toRadians(2.0);
         /** Extra heading offset (radians) if the shooter is not on the robot's front, e.g. PI. */
         public double shooterHeadingOffset = 0.0;
+        /** Camera position relative to the robot centre, inches (forward +, left +). */
+        public double cameraForward = 0.0;
+        public double cameraLeft = 0.0;
     }
 
     private final Gains g;
@@ -30,6 +33,22 @@ public final class AimController {
     /** Heading error (radians, CCW positive) from a Limelight tx reading in degrees. */
     public static double errorFromVision(double txDegrees) {
         return -Math.toRadians(txDegrees);
+    }
+
+    /**
+     * Heading error (radians, CCW positive) for the SHOOTER (robot centre line) from a Limelight tx when the
+     * camera is mounted off-centre.
+     *
+     * @param txDegrees Limelight tx, + = tag right of the crosshair
+     * @param cameraToTagFloorDistance floor distance from the camera to the tag, inches. If it is not a
+     *     positive number the uncorrected tx is used.
+     */
+    public double errorFromVision(double txDegrees, double cameraToTagFloorDistance) {
+        double b = errorFromVision(txDegrees);
+        if (!MathUtil.isFinite(cameraToTagFloorDistance) || cameraToTagFloorDistance <= 0) return b;
+        double fx = g.cameraForward + cameraToTagFloorDistance * Math.cos(b);
+        double fy = g.cameraLeft + cameraToTagFloorDistance * Math.sin(b);
+        return MathUtil.wrapAngle(Math.atan2(fy, fx) + g.shooterHeadingOffset);
     }
 
     /** Heading error (radians, CCW positive) from odometry. */

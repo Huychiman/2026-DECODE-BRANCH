@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.logic;
 
+import org.firstinspires.ftc.teamcode.config.RobotConfig;
+
 /**
  * Start / shoot / leave poses for each autonomous. Defined for RED and mirrored for BLUE.
  *
@@ -36,7 +38,8 @@ public final class AutoPaths {
             shootSpot = new Pose2d(-30.0, 24.0, 0);
             leave = new Pose2d(-6.0, 40.0, 0);
         } else {
-            s = Pose2d.degrees(63.0, 12.0, 180.0);
+            // Back bumper against the audience wall.
+            s = Pose2d.degrees(FieldGeometry.HALF_FIELD - RobotConfig.ROBOT_LENGTH / 2, 12.0, 180.0);
             // 5in off the wall: turning to face the goal swings the corners out to ~11.5in.
             shootSpot = new Pose2d(58.0, 12.0, 0);
             leave = new Pose2d(34.0, 26.0, 0);

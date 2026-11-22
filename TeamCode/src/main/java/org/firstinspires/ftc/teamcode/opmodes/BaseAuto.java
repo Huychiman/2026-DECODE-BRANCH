@@ -62,6 +62,7 @@ public abstract class BaseAuto extends NextFTCOpMode {
         telemetry.addData("Preload slots 0/1/2", "%s / %s / %s",
                 RobotConfig.PRELOAD[0], RobotConfig.PRELOAD[1], RobotConfig.PRELOAD[2]);
         telemetry.addData("Limelight", VisionSubsystem.INSTANCE.isConnected() ? "connected" : "NOT FOUND (odometry only)");
+        telemetry.addData("Odometry", DriveSubsystem.INSTANCE.getPoseSource());
         telemetry.addData("Motif", routine.getMotif() == null ? "not seen yet (fires slots in order)" : routine.getMotif());
         if (vis != null) telemetry.addData("Vision position", "(%.1f, %.1f)", vis[0], vis[1]);
         telemetry.update();
@@ -97,7 +98,7 @@ public abstract class BaseAuto extends NextFTCOpMode {
         KickerSubsystem.INSTANCE.setFiring(out.kickerFire);
 
         telemetry.addData("Phase", "%s  (%.1fs)", routine.getPhase(), routine.getElapsed());
-        telemetry.addData("Pose", drive.getPose());
+        telemetry.addData("Pose", "%s  [%s]", drive.getPose(), drive.getPoseSource());
         telemetry.addData("Shots", "%d fired, %d without ready flywheel", routine.getShotsFired(), routine.getTimedOutShots());
         telemetry.addData("Flywheel", "target %.0f actual %.0f %s", shooter.getTargetVelocity(), shooter.getVelocity(),
                 shooter.isEncoderFault() ? "ENCODER FAULT" : "");
